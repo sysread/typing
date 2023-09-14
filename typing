@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+set -eu -o pipefail
+
+# ------------------------------------------------------------------------------
+# Globals
+# ------------------------------------------------------------------------------
+MIN_DELAY="0.002"
+MAX_DELAY="0.009"
+TYPO_CHARS="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.'\":;-"
+TYPO_PROBABILITY=${TYPO_PROBABILITY:-50}  # chance in 10,000 of a typo occurring
+
+# ------------------------------------------------------------------------------
+# Functions
+# ------------------------------------------------------------------------------
+usage() {
+  local exit_code="${1:-0}"
+
+  cat <<EOL
+usage: type [OPTIONS]
+
+Options:
+  --help | -h  show help information
+  --slow | -s  type slower
+  --fast | -f  type faster
+
+EOL
+
+  exit "$exit_code"
+}
+
+pause() {
+  local min="${1:-$MIN_DELAY}"
+  local max="${2:-$MAX_DELAY}"
+
+  rand=$(echo "($max - $min) * 100" | bc | awk '{printf "%d", $1}')
+
+  # Ensure rand is never zero
+  [[ "$rand" -eq 0 ]] && rand=1
+
+  sleep "$(echo "scale=4; $min + ( $RANDOM % $rand ) / 100" | bc)"
+}
+
+typo() {
+  local typo_occur
+  local num_chars
+  local typo
+  local i
+
+  # Randomly decide if a typo should occur
+  typo_occur=$((RANDOM % 10000 < TYPO_PROBABILITY))
+
+  if [[ "$typo_occur" -eq 1 ]]; then
+    num_chars=$(((RANDOM % 4) + 1))
+
+    for ((i = 0; i < num_chars; i++)); do
+      typo=$(echo -n "$TYPO_CHARS" | fold -w1 | shuf -n1)
+      printf "%s" "$typo"
+      pause
+    done
+
+    # Short pause while the typist notices the error
+    pause 0.25 1
+
+    # Then delete it
+    for ((i = 0; i < num_chars; i++)); do
+      printf "\b \b"
+      pause
+    done
+  fi
+}
+
+# ------------------------------------------------------------------------------
+# Process arguments
+# ------------------------------------------------------------------------------
+while (("$#")); do
+  case "$1" in
+    --help | -h)
+      usage 0
+      ;;
+
+    --slow | w)
+      MIN_DELAY=$(echo "$MIN_DELAY * 3" | bc)
+      MAX_DELAY=$(echo "$MAX_DELAY * 3" | bc)
+      shift
+      ;;
+
+    --fast | -f)
+      MIN_DELAY=$(echo "$MIN_DELAY / 3" | bc)
+      MAX_DELAY=$(echo "$MAX_DELAY / 3" | bc)
+      shift
+      ;;
+
+    *) ;;
+  esac
+done
+
+# ------------------------------------------------------------------------------
+# "Type" out the input from STDIN
+# ------------------------------------------------------------------------------
+while IFS= read -r LINE; do
+  in_escape_seq=false
+
+  for ((i = 0; i < ${#LINE}; i++)); do
+    # Collect the correct character
+    char="${LINE:$i:1}"
+
+    # Check if entering an ANSI escape sequence
+    if [[ "$char" == $'\033' ]]; then
+      in_escape_seq=true
+    fi
+
+    # Possibly make a typo
+    if [[ "$in_escape_seq" == false ]]; then
+      typo
+    fi
+
+    # Now type the correct character
+    printf "%s" "$char"
+
+    # Check if leaving an ANSI escape sequence
+    if [[ "$in_escape_seq" == true && "$char" == "m" ]]; then
+      in_escape_seq=false
+      continue
+    fi
+
+    # Sleep only for printable characters outside of escape sequences
+    if [[ "$in_escape_seq" == false && "$char" =~ [[:print:]] ]]; then
+      pause
+    fi
+  done
+
+  echo
+done
