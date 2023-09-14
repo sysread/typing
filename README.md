@@ -13,6 +13,9 @@ echo "How now brown bureaucrat" | typing
 Prints piped output to the terminal, introducing short delays to make it appear
 as though it is being typed by a person.
 
+![Typing the truth](./assets/typing.gif)
+
+
 # OPTIONS
 
 - `--help` - show help information
