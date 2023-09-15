@@ -9,7 +9,7 @@ MIN_DELAY="0.0001"
 MAX_DELAY="0.0005"
 SCALE=${#MIN_DELAY}
 
-TYPO_PROBABILITY=${TYPO_PROBABILITY:-50}  # chance in 10,000 of a typo occurring
+TYPO_PROBABILITY=${TYPO_PROBABILITY:-50} # chance in 10,000 of a typo occurring
 
 # ------------------------------------------------------------------------------
 # Pausing based on keyboard distances
