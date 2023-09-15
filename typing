@@ -13,7 +13,7 @@ TYPO_CHARS="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.'\":
 TYPO_PROBABILITY=${TYPO_PROBABILITY:-50}  # chance in 10,000 of a typo occurring
 
 # ------------------------------------------------------------------------------
-# Keyboard distances
+# Pausing based on keyboard distances
 # ------------------------------------------------------------------------------
 declare -A keyboard_layout
 
@@ -108,8 +108,148 @@ calculate_distance() {
   echo "$distance"
 }
 
+min_delay() {
+  local from_char="$1"
+  local to_char="$2"
+  local distance=1
+
+  if [ -n "$from_char" ]; then
+    distance=$(calculate_distance "$from_char" "$to_char")
+  fi
+
+  min=$(echo "scale=$SCALE; $MIN_DELAY * $distance" | bc -l)
+}
+
+pause() {
+  local min="${1:-$MIN_DELAY}"
+  local max="${2:-$MAX_DELAY}"
+
+  rand=$(echo "($max - $min) * 100" | bc | awk '{printf "%d", $1}')
+
+  # Ensure rand is never zero
+  [[ "$rand" -eq 0 ]] && rand=1
+
+  sleep "$(echo "scale=$SCALE; $min + ( $RANDOM % $rand ) / 100" | bc)"
+}
+
 # ------------------------------------------------------------------------------
-# General functions
+# Typos
+# ------------------------------------------------------------------------------
+declare -A neighbors
+
+neighbors=(
+             ["q"]="was"
+             ["w"]="qase"
+             ["e"]="wsdr"
+             ["r"]="edft"
+             ["t"]="rfyg"
+             ["y"]="tghu"
+             ["u"]="yhji"
+             ["i"]="ujko"
+             ["o"]="iklp"
+             ["p"]="ol['"
+
+             ["a"]="qwsz"
+             ["s"]="wedxza"
+             ["d"]="erfcxs"
+             ["f"]="rtgvcd"
+             ["g"]="tyhbvf"
+             ["h"]="yujnbg"
+             ["j"]="uihkmn"
+             ["k"]="iojlm,"
+             ["l"]="opk;.'"
+
+             ["z"]="asx"
+             ["x"]="sdcz"
+             ["c"]="dxfv"
+             ["v"]="fgbc"
+             ["b"]="ghvn"
+             ["n"]="hjbm"
+             ["m"]="jkln,"
+
+             ["1"]="q2"
+             ["2"]="qw13"
+             ["3"]="we24"
+             ["4"]="er35"
+             ["5"]="rt46"
+             ["6"]="ty57"
+             ["7"]="yu68"
+             ["8"]="ui79"
+             ["9"]="io80"
+             ["0"]="op9-"
+
+             ['`']="1~"
+             ["-"]="0p=[]"
+             ["="]="-[]\\"
+             ["\\"]="]['"
+             ["["]="p-=]'\\"
+             ["]"]="=-['\\"
+             [";"]="lk.,/'"
+             ["'"]="l;."
+             [","]="mnk<"
+             ["."]=",;/'<>"
+             ["/"]="' ;.,>?"
+             ["<"]="m,>"
+             [">"]=",.<?"
+             ["?"]="./>"
+
+             ["~"]='`'
+             ["!"]="1@"
+             ["@"]="!2#"
+             ["#"]="@3$"
+             ["$"]="#4%"
+             ["%"]="\$5^"
+             ["^"]="%6&"
+             ["&"]="^7*"
+             ["*"]="&8("
+             ["("]="*9)"
+             [")"]="(0_"
+             ["_"]=")-+"
+             ["+"]="_=}"
+             ["{"]="[{"
+             ["}"]="]{|"
+             ["|"]="}+"
+             [":"]=";\""
+             ['"']=":'"
+             ["<"]=","
+             [">"]="."
+             ["?"]="/"
+)
+
+# Add uppercased neighbors
+for key in "${!neighbors[@]}"; do
+  upper_key=$(echo "$key" | tr '[:lower:]' '[:upper:]')
+  if [[ $key =~ [a-zA-Z] ]]; then
+    neighbors["$upper_key"]="${key}${neighbors[$key]}"
+  fi
+done
+
+typo() {
+  local char="$1"
+  local typo_occur
+  local typo
+  local i
+
+  # Randomly decide if a typo should occur
+  typo_occur=$((RANDOM % 10000 < TYPO_PROBABILITY))
+
+  if [[ "$typo_occur" -eq 1 ]] && [[ -n "${neighbors[$char]}" ]]; then
+    chars="${neighbors[$char]}"
+
+    if [ -n "$chars" ]; then
+      typo=$(echo -n "$chars" | fold -w1 | shuf -n1)
+
+      printf "%s" "$typo"
+      pause 0.25 1
+
+      printf "\b \b"
+      pause
+    fi
+  fi
+}
+
+# ------------------------------------------------------------------------------
+# Other functions
 # ------------------------------------------------------------------------------
 usage() {
   local exit_code="${1:-0}"
@@ -125,47 +265,6 @@ Options:
 EOL
 
   exit "$exit_code"
-}
-
-pause() {
-  local min="${1:-$MIN_DELAY}"
-  local max="${2:-$MAX_DELAY}"
-
-  rand=$(echo "($max - $min) * 100" | bc | awk '{printf "%d", $1}')
-
-  # Ensure rand is never zero
-  [[ "$rand" -eq 0 ]] && rand=1
-
-  sleep "$(echo "scale=$SCALE; $min + ( $RANDOM % $rand ) / 100" | bc)"
-}
-
-typo() {
-  local typo_occur
-  local num_chars
-  local typo
-  local i
-
-  # Randomly decide if a typo should occur
-  typo_occur=$((RANDOM % 10000 < TYPO_PROBABILITY))
-
-  if [[ "$typo_occur" -eq 1 ]]; then
-    num_chars=$(((RANDOM % 4) + 1))
-
-    for ((i = 0; i < num_chars; i++)); do
-      typo=$(echo -n "$TYPO_CHARS" | fold -w1 | shuf -n1)
-      printf "%s" "$typo"
-      pause
-    done
-
-    # Short pause while the typist notices the error
-    pause 0.25 1
-
-    # Then delete it
-    for ((i = 0; i < num_chars; i++)); do
-      printf "\b \b"
-      pause
-    done
-  fi
 }
 
 # ------------------------------------------------------------------------------
@@ -212,7 +311,7 @@ while IFS= read -r LINE; do
 
     # Possibly make a typo
     if [[ "$in_escape_seq" == false ]]; then
-      typo
+      typo "$char"
     fi
 
     # Now type the correct character
@@ -226,18 +325,9 @@ while IFS= read -r LINE; do
 
     # Sleep only for printable characters outside of escape sequences
     if [[ "$in_escape_seq" == false && "$char" =~ [[:print:]] ]]; then
-      dist="1"
-
-      if [ -n "$last_char" ]; then
-        dist=$(calculate_distance "$last_char" "$char")
-      fi
+      pause "$(min_delay "$last_char" "$char")" "$MAX_DELAY"
 
       last_char="$char"
-
-      min=$(echo "scale=$SCALE; $MIN_DELAY * $dist" | bc -l)
-      max=$MAX_DELAY
-
-      pause "$min" "$max"
     fi
   done
 
