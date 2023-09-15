@@ -86,14 +86,14 @@ calculate_distance() {
   fi
 
   if [[ -n "${keyboard_layout[$1]-}" ]]; then
-    IFS=',' read -r y1 x1 <<<"${keyboard_layout[$1]}"
+    IFS=',' read -r y1 x1 <<< "${keyboard_layout[$1]}"
   else
     x1=5.5
     y1=2
   fi
 
   if [[ -n "${keyboard_layout[$2]-}" ]]; then
-    IFS=',' read -r y2 x2 <<<"${keyboard_layout[$2]}"
+    IFS=',' read -r y2 x2 <<< "${keyboard_layout[$2]}"
   else
     x2=5.5
     y2=2
@@ -251,7 +251,7 @@ typo() {
 usage() {
   local exit_code="${1:-0}"
 
-  cat <<EOL
+  cat << EOL
 usage: type [OPTIONS]
 
 Options:
