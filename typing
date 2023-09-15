@@ -100,7 +100,7 @@ calculate_distance() {
   fi
 
   distance=$(awk -v x1="$x1" -v y1="$y1" -v x2="$x2" -v y2="$y2" \
-             'BEGIN {print sqrt((x2-x1)^2 + (y2-y1)^2)}')
+    'BEGIN {print sqrt((x2-x1)^2 + (y2-y1)^2)}')
 
   distances[$1 - $2]="$distance"
 
