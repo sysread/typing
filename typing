@@ -85,14 +85,14 @@ calculate_distance() {
     return
   fi
 
-  if [[ -n "${keyboard_layout[$1]-}" ]]; then
+  if [[ -v keyboard_layout[$1] ]]; then
     IFS=',' read -r y1 x1 <<< "${keyboard_layout[$1]}"
   else
     x1=5.5
     y1=2
   fi
 
-  if [[ -n "${keyboard_layout[$2]-}" ]]; then
+  if [[ -v keyboard_layout[$2] ]]; then
     IFS=',' read -r y2 x2 <<< "${keyboard_layout[$2]}"
   else
     x2=5.5
@@ -221,26 +221,28 @@ for key in "${!neighbors[@]}"; do
   fi
 done
 
+# Randomly decide if a typo should occur
 typo() {
   local char="$1"
   local typo_occur
   local typo
   local i
 
-  # Randomly decide if a typo should occur
-  typo_occur=$((RANDOM % 10000 < TYPO_PROBABILITY))
+  if [[ -v neighbors["$char"] ]]; then
+    typo_occur=$((RANDOM % 10000 < TYPO_PROBABILITY))
 
-  if [[ "$typo_occur" -eq 1 ]] && [[ -n "${neighbors[$char]}" ]]; then
-    chars="${neighbors[$char]}"
+    if [[ "$typo_occur" -eq 1 ]]; then
+      chars="${neighbors["$char"]}"
 
-    if [ -n "$chars" ]; then
-      typo=$(echo -n "$chars" | fold -w1 | shuf -n1)
+      if [ -n "$chars" ]; then
+        typo=$(echo -n "$chars" | fold -w1 | shuf -n1)
 
-      printf "%s" "$typo"
-      pause 0.25 1
+        printf "%s" "$typo"
+        pause 0.25 1
 
-      printf "\b \b"
-      pause
+        printf "\b \b"
+        pause
+      fi
     fi
   fi
 }
